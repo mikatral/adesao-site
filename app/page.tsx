@@ -1,24 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { Empresa, Colaborador, EnvioModo } from '@/types/domain';
 
-type Empresa = {
-  razaoSocial: string;
-  cnpj: string;
-  email: string;
-  telefone: string;   // obrigatório
-  cidade?: string;
-  uf?: string;
-  cep?: string;
-  atendente: string;  // obrigatório
-};
 
-type Colaborador = {
-  nome: string;
-  cpf: string;
-  dataNascimento: string; // dd/mm/aaaa
-  nomeMae: string;
-};
 
 function onlyDigits(s: string) {
   return (s || '').replace(/\D/g, '');
@@ -394,7 +379,9 @@ export default function Home() {
   }, [cnpjValido, empresa.cnpj]);
 
   // Handlers
-  const handleEmpresaChange = (k: keyof Empresa, v: string) => setEmpresa(prev => ({ ...prev, [k]: v }));
+  const handleEmpresaChange = <K extends keyof Empresa>(campo: K, valor: Empresa[K]) => {
+    setEmpresa(prev => ({ ...prev, [campo]: valor } as Empresa));
+  };
   const handleColabChange = (i: number, k: keyof Colaborador, v: string) =>
     setColabs(prev => prev.map((c, idx) => idx === i ? { ...c, [k]: v } : c));
 
@@ -444,7 +431,7 @@ export default function Home() {
       form.append('modo', 'pdf');
       form.append('empresa', JSON.stringify(empresa));
       form.append('pdf', pdfFile, pdfFile.name);
-      
+
 
       const r = await fetch('/api/adesao', { method: 'POST', body: form });
 

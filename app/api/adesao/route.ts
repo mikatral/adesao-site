@@ -1,6 +1,9 @@
 // app/api/adesao/route.ts
 import { NextResponse } from 'next/server';
 import * as nodemailer from 'nodemailer';
+import type { Empresa, Colaborador } from '@/types/domain';
+import { isEmpresa } from '@/types/domain';
+
 
 export const runtime = 'nodejs';
 
@@ -28,6 +31,7 @@ function dvCalc(nums: number[], pesos: number[]) {
     const s = nums.reduce((acc, n, i) => acc + n * pesos[i], 0);
     const r = s % 11; return r < 2 ? 0 : 11 - r;
 }
+
 function validarCPF(cpf: string) {
     const d = onlyDigits(cpf);
     if (d.length !== 11 || /^(\d)\1+$/.test(d)) return false;
@@ -66,26 +70,25 @@ function validarTelefoneBR(s: string) {
     return d.length === 10 || d.length === 11; // DDD+fixo ou DDD+cel
 }
 
-function emailHtml(empresa: any, colaboradores: any[] = []) {
+function emailHtml(empresa: Empresa, colaboradores: Colaborador[] = []) {
     const cidadeUfRaw = [empresa?.cidade, empresa?.uf].filter(Boolean).join(' - ');
     const cidadeUfEsc = esc(cidadeUfRaw);
     const saudacao = saudacaoBR()
-
     const colaboradoresTable = colaboradores.length
         ? `<h3>Colaboradores (${colaboradores.length})</h3>
        <table cellpadding="6" cellspacing="0" style="border-collapse:collapse;border:1px solid #eee">
          <tr><th align="left">Nome</th><th align="left">CPF</th><th align="left">Nascimento</th><th align="left">Mãe</th></tr>
-         ${colaboradores.map((c: any) => `
+         ${colaboradores.map((c: Colaborador) => `
           <tr>
-            <td>${esc(c?.nome)}</td>
-            <td>${esc(c?.cpf)}</td>
-            <td>${esc(c?.dataNascimento)}</td>
-            <td>${esc(c?.nomeMae)}</td>
+            <td>${c.nome || ''}</td>
+            <td>${c.cpf || ''}</td>
+            <td>${c.dataNascimento || ''}</td>
+            <td>${c.nomeMae || ''}</td>
           </tr>`).join('')}
        </table>`
-        : '<p><em>Nenhum colaborador listado (anexo).</em></p>';
+        : '<p><em>Nenhum colaborador listado (PDF/Excel em anexo).</em></p>';
 
-    return `
+return `
   <div style="font-family:Arial,sans-serif;font-size:14px;color:#111">
     <p>${saudacao} a todos,</p>
     <p>${esc(empresa?.atendente) || 'Atendimento'}, obrigado pelo envio dos dados.</p>
@@ -133,17 +136,27 @@ export async function POST(req: Request) {
             const modo = String(form.get('modo') || '');
             const empresaStr = String(form.get('empresa') || '{}');
 
-            let empresaObj: any = {};
-            try { empresaObj = JSON.parse(empresaStr); } catch { }
+            // Parse seguro + type guard
+            const raw = (() => { try { return JSON.parse(empresaStr); } catch { return null; } })();
 
-            // valida empresa
+            if (!isEmpresa(raw)) {
+                return NextResponse.json(
+                    { error: 'Objeto "empresa" inválido. Campos obrigatórios: razão social, CNPJ, e-mail, telefone e atendente.' },
+                    { status: 400 }
+                );
+            }
+            const empresa: Empresa = raw;
+
+            // Validações complementares (regras de negócio)
             const erros: string[] = [];
-            if (!empresaObj?.razaoSocial) erros.push('Razão Social é obrigatória.');
-            if (!empresaObj?.cnpj || !validarCNPJ(empresaObj.cnpj)) erros.push('CNPJ inválido.');
-            if (!empresaObj?.email || !/.+@.+\..+/.test(empresaObj.email)) erros.push('E-mail da empresa inválido.');
-            if (!empresaObj?.telefone || !validarTelefoneBR(empresaObj.telefone)) erros.push('Telefone inválido.');
-            if (!empresaObj?.atendente || !empresaObj.atendente.trim()) erros.push('Atendente é obrigatório.');
-            if (erros.length) return NextResponse.json({ error: erros.join(' ') }, { status: 400 });
+            if (!validarCNPJ(empresa.cnpj)) erros.push('CNPJ inválido.');
+            if (!/.+@.+\..+/.test(empresa.email)) erros.push('E-mail da empresa inválido.');
+            if (!validarTelefoneBR(empresa.telefone)) erros.push('Telefone inválido.');
+            if (!empresa.atendente.trim()) erros.push('Atendente é obrigatório.');
+            if (erros.length) {
+                return NextResponse.json({ error: erros.join(' ') }, { status: 400 });
+            }
+
 
             // ----- PDF -----
             if (modo === 'pdf') {
@@ -160,12 +173,12 @@ export async function POST(req: Request) {
                 }
 
                 const bytes = new Uint8Array(await pdf.arrayBuffer());
-                const html = emailHtml(empresaObj, []);
-                const subject = `Adesão (${empresaObj.razaoSocial}) – PDF de colaboradores`;
+                const html = emailHtml(empresa, []);
+                const subject = `Adesão (${empresa.razaoSocial}) – PDF de colaboradores`;
 
                 const info = await transporter.sendMail({
                     from,
-                    to: to.length ? to : [empresaObj.email],
+                    to: to.length ? to : [empresa.email],
                     cc: cc.length ? cc : undefined,
                     subject,
                     html,
@@ -199,12 +212,12 @@ export async function POST(req: Request) {
                 }
 
                 const bytes = new Uint8Array(await xls.arrayBuffer());
-                const html = emailHtml(empresaObj, []); // sem lista; Excel vai anexo
-                const subject = `Adesão (${empresaObj.razaoSocial}) – Excel de colaboradores`;
+                const html = emailHtml(empresa, []); // sem lista; Excel vai anexo
+                const subject = `Adesão (${empresa.razaoSocial}) – Excel de colaboradores`;
 
                 const info = await transporter.sendMail({
                     from,
-                    to: to.length ? to : [empresaObj.email],
+                    to: to.length ? to : [empresa.email],
                     cc: cc.length ? cc : undefined,
                     subject,
                     html,
@@ -223,9 +236,15 @@ export async function POST(req: Request) {
         }
 
         // ========== JSON (formulário) ==========
-        const body = await req.json().catch(() => null) as any;
-        const empresa = body?.empresa;
-        const colaboradores = body?.colaboradores || [];
+        const body = (await req.json().catch(() => null)) as
+            | { empresa: Empresa; colaboradores: Colaborador[] }
+            | null;
+
+        if (!body) {
+            return NextResponse.json({ error: 'JSON inválido.' }, { status: 400 });
+        }
+
+        const { empresa, colaboradores } = body;
 
         const errs: string[] = [];
         if (!empresa?.razaoSocial) errs.push('Razão Social é obrigatória.');
@@ -233,7 +252,7 @@ export async function POST(req: Request) {
         if (!empresa?.email || !/.+@.+\..+/.test(empresa.email)) errs.push('E-mail da empresa inválido.');
         if (!empresa?.telefone || !validarTelefoneBR(empresa.telefone)) errs.push('Telefone inválido.');
         if (!empresa?.atendente || !empresa.atendente.trim()) errs.push('Atendente é obrigatório.');
-        colaboradores.forEach((c: any, i: number) => {
+        colaboradores.forEach((c: Colaborador, i: number) => {
             if (!(c?.nome && c?.cpf && c?.dataNascimento)) errs.push(`Colaborador ${i + 1}: preencha nome, CPF e data de nascimento.`);
             if (c?.cpf && !validarCPF(c.cpf)) errs.push(`Colaborador ${i + 1}: CPF inválido.`);
         });
