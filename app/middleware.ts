@@ -16,7 +16,7 @@ function isOpen(d: Date) {
   const dow = d.getDay();
   const hour = d.getHours(); // 0..23
   const weekday = dow >= 1 && dow <= 5;
-  const businessHours = hour >= 8 && hour < 11; // 08:00 inclusive até 17:59
+  const businessHours = hour >= 8 && hour < 18; // 08:00 inclusive até 17:59
   return weekday && businessHours;
 }
 
