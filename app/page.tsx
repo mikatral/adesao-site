@@ -6,11 +6,11 @@ type Empresa = {
   razaoSocial: string;
   cnpj: string;
   email: string;
-  telefone?: string;
+  telefone: string;   // obrigatório
   cidade?: string;
   uf?: string;
   cep?: string;
-  atendente?: string;
+  atendente: string;  // obrigatório
 };
 
 type Colaborador = {
@@ -48,6 +48,12 @@ function validarCNPJ(cnpj: string) {
   const dv2 = dvCalc(n.slice(0, 12).concat(dv1), pesos2);
   return n[12] === dv1 && n[13] === dv2;
 }
+function validarTelefoneBR(s: string) {
+  const d = onlyDigits(s);
+  // Aceita 10 (fixo c/ DDD) ou 11 (celular c/ DDD)
+  return d.length === 10 || d.length === 11;
+}
+
 function formatCPF(s: string) {
   const d = onlyDigits(s).slice(0, 11);
   // monta 000.000.000-00
@@ -131,10 +137,16 @@ export default function Home() {
   const [step, setStep] = useState<1 | 2>(1);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  type EnvioModo = 'form' | 'pdf';
+  const MAX_PDF_MB = 10;
+  const MAX_PDF_BYTES = MAX_PDF_MB * 1024 * 1024;
+
+
+  type EnvioModo = 'form' | 'pdf' | 'excel';
   const [envioModo, setEnvioModo] = useState<EnvioModo>('form');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const pdfOnlyInputRef = useRef<HTMLInputElement | null>(null);
+  const [xlsFile, setXlsFile] = useState<File | null>(null);
+  const xlsOnlyInputRef = useRef<HTMLInputElement | null>(null);
 
   // Empresa
   const [empresa, setEmpresa] = useState<Empresa>({
@@ -145,7 +157,7 @@ export default function Home() {
     cidade: '',
     uf: '',
     cep: '',
-    atendente: 'Matheus',
+    atendente: '',
   });
   const cnpjValido = useMemo(() => validarCNPJ(empresa.cnpj), [empresa.cnpj]);
 
@@ -390,9 +402,12 @@ export default function Home() {
     return (
       cnpjValido &&
       empresa.razaoSocial.trim().length > 1 &&
-      /.+@.+\..+/.test(empresa.email)
+      /.+@.+\..+/.test(empresa.email) &&
+      validarTelefoneBR(empresa.telefone) &&
+      empresa.atendente.trim().length > 1
     );
-  }, [cnpjValido, empresa.razaoSocial, empresa.email]);
+  }, [cnpjValido, empresa.razaoSocial, empresa.email, empresa.telefone, empresa.atendente]);
+
 
   const [tenteiEnviar, setTenteiEnviar] = useState(false)
 
@@ -408,11 +423,11 @@ export default function Home() {
   async function handleSubmit() {
     // marca que tentou enviar (para exibir mensagens globais de erro no UI)
     setTenteiEnviar(true);
-
     // ---------------------------
     // CAMINHO 1: MODO "PDF-ONLY"
     // ---------------------------
     if (envioModo === 'pdf') {
+
       // valida mínimos da empresa (front) — o back também valida
       if (!podeIrParaStep2) {
         alert('Preencha os dados da empresa corretamente.');
@@ -423,11 +438,13 @@ export default function Home() {
         return;
       }
 
+
       // monta multipart/form-data
       const form = new FormData();
       form.append('modo', 'pdf');
       form.append('empresa', JSON.stringify(empresa));
       form.append('pdf', pdfFile, pdfFile.name);
+      
 
       const r = await fetch('/api/adesao', { method: 'POST', body: form });
 
@@ -440,7 +457,7 @@ export default function Home() {
         setTenteiEnviar(false);
         if (pdfOnlyInputRef.current) pdfOnlyInputRef.current.value = '';
         setEmpresa({
-          razaoSocial: '', cnpj: '', email: '', telefone: '', cidade: '', uf: '', cep: '', atendente: 'Cinthia'
+          razaoSocial: '', cnpj: '', email: '', telefone: '', cidade: '', uf: '', cep: '', atendente: ''
         });
         setColabs([{ nome: '', cpf: '', dataNascimento: '', nomeMae: '' }]);
       } else {
@@ -448,6 +465,49 @@ export default function Home() {
         alert(`Falha ao enviar PDF: ${j?.error ?? r.statusText}`);
       }
       return; // encerra aqui no modo PDF
+    }
+
+    // ---------------------------
+    // CAMINHO 2: MODO "EXCEL-ONLY"
+    // ---------------------------
+    if (envioModo === 'excel') {
+      if (!podeIrParaStep2) {
+        alert('Preencha os dados da empresa corretamente.');
+        return;
+      }
+      if (!xlsFile) {
+        alert('Selecione um Excel (.xlsx ou .xls).');
+        return;
+      }
+      if (xlsFile.size > MAX_PDF_BYTES) {
+        alert(`O arquivo tem ${(xlsFile.size / 1024 / 1024).toFixed(1)} MB. O limite é ${MAX_PDF_MB} MB.`);
+        return;
+      }
+
+      const form = new FormData();
+      form.append('modo', 'excel');
+      form.append('empresa', JSON.stringify(empresa));
+      form.append('xls', xlsFile, xlsFile.name);
+
+      const r = await fetch('/api/adesao', { method: 'POST', body: form });
+
+      if (r.ok) {
+        alert('Excel enviado! Você receberá a confirmação por e-mail (quando o envio estiver ativo).');
+        // reset
+        setStep(1);
+        setEnvioModo('form');
+        setXlsFile(null);
+        setTenteiEnviar(false);
+        if (xlsOnlyInputRef.current) xlsOnlyInputRef.current.value = '';
+        setEmpresa({
+          razaoSocial: '', cnpj: '', email: '', telefone: '', cidade: '', uf: '', cep: '', atendente: ''
+        });
+        setColabs([{ nome: '', cpf: '', dataNascimento: '', nomeMae: '' }]);
+      } else {
+        const j = await r.json().catch(() => ({}));
+        alert(`Falha ao enviar Excel: ${j?.error ?? r.statusText}`);
+      }
+      return;
     }
 
     // ---------------------------
@@ -462,7 +522,7 @@ export default function Home() {
     const erros: string[] = [];
     if (!podeIrParaStep2) erros.push('Preencha os dados da empresa corretamente.');
     colabs.forEach((c, i) => {
-      // Nome da mãe não é mais obrigatório
+
       if (!(c.nome && c.cpf && c.dataNascimento)) {
         erros.push(`Colaborador ${i + 1}: preencha nome, CPF e data de nascimento.`);
       }
@@ -488,7 +548,7 @@ export default function Home() {
       // reset
       setStep(1);
       setEmpresa({
-        razaoSocial: '', cnpj: '', email: '', telefone: '', cidade: '', uf: '', cep: '', atendente: 'Cinthia'
+        razaoSocial: '', cnpj: '', email: '', telefone: '', cidade: '', uf: '', cep: '', atendente: ''
       });
       setColabs([{ nome: '', cpf: '', dataNascimento: '', nomeMae: '' }]);
       setTenteiEnviar(false);
@@ -543,12 +603,17 @@ export default function Home() {
             />
           </label>
           <label>
-            Telefone
+            Telefone*
             <input
               value={empresa.telefone}
               onChange={e => handleEmpresaChange('telefone', e.target.value)}
-              placeholder="(17) 99999-9999"
+              placeholder="(11) 99999-9999"
             />
+            {empresa.telefone && !validarTelefoneBR(empresa.telefone) && (
+              <span style={{ color: '#b00', fontSize: 12, marginTop: 4 }}>
+                Telefone inválido (use DDD + número).
+              </span>
+            )}
           </label>
           <label>
             Cidade
@@ -568,11 +633,11 @@ export default function Home() {
             />
           </label>
           <label>
-            Atendente
+            Primeiro Nome*
             <input
-              value={empresa.atendente || ''}
+              value={empresa.atendente}
               onChange={e => handleEmpresaChange('atendente', e.target.value)}
-              placeholder="Cinthia"
+              placeholder="Insira seu nome"
             />
           </label>
         </div>
@@ -606,6 +671,7 @@ export default function Home() {
               />
               Preencher/Importar na tela
             </label>
+
             <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input
                 type="radio"
@@ -616,6 +682,17 @@ export default function Home() {
               />
               Anexar PDF com a lista (sem leitura)
             </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                type="radio"
+                name="modo"
+                value="excel"
+                checked={envioModo === 'excel'}
+                onChange={() => setEnvioModo('excel')}
+              />
+              Anexar Excel com a lista (sem leitura)
+            </label>
+
           </div>
 
           {envioModo === 'pdf' && (
@@ -623,18 +700,29 @@ export default function Home() {
               <div style={{ border: '1px dashed #bbb', padding: 12, borderRadius: 8, marginBottom: 12 }}>
                 <strong>Anexar PDF com a lista de colaboradores</strong>
                 <p style={{ margin: '6px 0 10px', color: '#555' }}>
-                  Selecione um arquivo <strong>.pdf</strong>. O arquivo será enviado em anexo (não faremos leitura do conteúdo).
+                  Selecione um arquivo <strong>.pdf</strong> (máx. {MAX_PDF_MB} MB). O arquivo será enviado em anexo (não faremos leitura do conteúdo).
                 </p>
+
                 <input
                   ref={pdfOnlyInputRef}
                   type="file"
                   accept="application/pdf"
                   onClick={e => { (e.currentTarget as HTMLInputElement).value = ''; }} // permite re-escolher o mesmo arquivo
-                  onChange={e => setPdfFile(e.target.files?.[0] ?? null)}
+                  onChange={e => {
+                    const f = e.target.files?.[0] ?? null;
+                    if (f && f.size > MAX_PDF_BYTES) {
+                      alert(`O PDF tem ${(f.size / 1024 / 1024).toFixed(1)} MB. O limite é ${MAX_PDF_MB} MB.`);
+                      setPdfFile(null);
+                      (e.currentTarget as HTMLInputElement).value = '';
+                      return;
+                    }
+                    setPdfFile(f);
+                  }}
                 />
+
                 {pdfFile && (
                   <p style={{ marginTop: 8, fontSize: 12, color: '#444' }}>
-                    Selecionado: {pdfFile.name} ({Math.round((pdfFile.size / 1024))} KB)
+                    Selecionado: {pdfFile.name} ({(pdfFile.size / 1024 / 1024).toFixed(1)} MB)
                   </p>
                 )}
               </div>
@@ -653,12 +741,82 @@ export default function Home() {
                   Voltar
                 </button>
 
-                <button onClick={handleSubmit} disabled={!pdfFile /* ou !pdfFile || !podeIrParaStep2 */}>
+                <button
+                  onClick={handleSubmit}
+                  disabled={!pdfFile || !podeIrParaStep2}
+                >
                   Enviar PDF
                 </button>
               </div>
             </>
           )}
+
+          {envioModo === 'excel' && (
+            <>
+              <div style={{ border: '1px dashed #bbb', padding: 12, borderRadius: 8, marginBottom: 12 }}>
+                <strong>Anexar Excel com a lista de colaboradores</strong>
+                <p style={{ margin: '6px 0 10px', color: '#555' }}>
+                  Selecione um arquivo <strong>.xlsx</strong> ou <strong>.xls</strong> (máx. {MAX_PDF_MB} MB). O arquivo será enviado em anexo (não faremos leitura).
+                </p>
+
+                <input
+                  ref={xlsOnlyInputRef}
+                  type="file"
+                  accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                  onClick={e => { (e.currentTarget as HTMLInputElement).value = ''; }} // permite re-escolher o mesmo arquivo
+                  onChange={e => {
+                    const f = e.target.files?.[0] ?? null;
+                    if (f && f.size > MAX_PDF_BYTES) {
+                      alert(`O arquivo tem ${(f.size / 1024 / 1024).toFixed(1)} MB. O limite é ${MAX_PDF_MB} MB.`);
+                      setXlsFile(null);
+                      (e.currentTarget as HTMLInputElement).value = '';
+                      return;
+                    }
+                    // checagem simples por extensão (alguns browsers não setam o mime correto)
+                    const name = (f?.name || '').toLowerCase();
+                    const okExt = name.endsWith('.xlsx') || name.endsWith('.xls');
+                    if (f && !okExt) {
+                      alert('Escolha um arquivo .xlsx ou .xls.');
+                      setXlsFile(null);
+                      (e.currentTarget as HTMLInputElement).value = '';
+                      return;
+                    }
+                    setXlsFile(f);
+                  }}
+                />
+
+                {xlsFile && (
+                  <p style={{ marginTop: 8, fontSize: 12, color: '#444' }}>
+                    Selecionado: {xlsFile.name} ({(xlsFile.size / 1024 / 1024).toFixed(1)} MB)
+                  </p>
+                )}
+              </div>
+
+              {/* botões */}
+              <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+                <button
+                  onClick={() => {
+                    setStep(1);
+                    setTenteiEnviar(false);
+                    setXlsFile(null);
+                    if (xlsOnlyInputRef.current) xlsOnlyInputRef.current.value = '';
+                  }}
+                  style={{ background: '#eee' }}
+                >
+                  Voltar
+                </button>
+
+                <button
+                  onClick={handleSubmit}
+                  disabled={!xlsFile || !podeIrParaStep2} // exige empresa válida + arquivo
+                >
+                  Enviar Excel
+                </button>
+              </div>
+            </>
+          )}
+
+
 
 
           {envioModo === 'form' && (
