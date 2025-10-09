@@ -48,6 +48,18 @@ function formatCPF(s: string) {
   if (p4) out += '-' + p4;
   return out;
 }
+// Coloca automaticamente as barras em dd/mm/aaaa enquanto digita
+function maskDateBR(v: string): string {
+  const d = v.replace(/\D/g, '').slice(0, 8); // só dígitos, máximo 8
+  const p1 = d.slice(0, 2);
+  const p2 = d.slice(2, 4);
+  const p3 = d.slice(4, 8);
+  let out = p1;
+  if (p2) out += '/' + p2;
+  if (p3) out += '/' + p3;
+  return out;
+}
+
 
 // Normaliza nome para comparar (sem acentos, minúsculo, espaços únicos)
 function normName(s: string) {
@@ -818,8 +830,12 @@ export default function Home() {
                       Data de Nascimento* (dd/mm/aaaa)
                       <input
                         value={c.dataNascimento}
-                        onChange={(e) => handleColabChange(i, 'dataNascimento', e.target.value)}
+                        onChange={(e) =>
+                          handleColabChange(i, 'dataNascimento', maskDateBR(e.target.value))
+                        }
                         placeholder="01/02/1990"
+                        inputMode="numeric"
+                        maxLength={10}
                       />
                       {c.dataNascimento && !isDataBR(c.dataNascimento) && (
                         <span className="error-tip">Data inválida (use dd/mm/aaaa)</span>
@@ -917,6 +933,7 @@ export default function Home() {
           font-size: 14px;
           width: 100%;
         }
+          
 
         .modes {
           display: flex;
@@ -929,6 +946,11 @@ export default function Home() {
           align-items: center;
           gap: 8px;
           white-space: nowrap;
+        }
+        .error-tip {
+          color: #b00;
+          font-size: 12px;
+          margin-top: 4px;
         }
 
         .filebox {
