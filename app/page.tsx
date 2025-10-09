@@ -327,10 +327,11 @@ export default function Home() {
   }
 
   // Auto-preencher cidade/UF/CEP/razão social pelo CNPJ quando válido
+  const cnpjVal = cnpjValido; // só para memo deps estáveis
   useEffect(() => {
     let abort = false;
     async function fetchCNPJ() {
-      if (!cnpjValido) return;
+      if (!cnpjVal) return;
       const url = `/api/cnpj?cnpj=${encodeURIComponent(empresa.cnpj)}`;
       try {
         const r = await fetch(url, { cache: 'no-store' });
@@ -362,7 +363,7 @@ export default function Home() {
     return () => {
       abort = true;
     };
-  }, [cnpjValido, empresa.cnpj]);
+  }, [cnpjVal, empresa.cnpj]);
 
   // Handlers
   const handleEmpresaChange = <K extends keyof Empresa>(campo: K, valor: Empresa[K]) => {
@@ -537,14 +538,14 @@ export default function Home() {
   }
 
   return (
-    <main style={{ maxWidth: 860, margin: '40px auto', padding: 24 }}>
+    <main className="container">
       <h1>Adesão – HS</h1>
-      <p style={{ color: '#555' }}>Preencha os dados abaixo. O envio encaminha para nossa equipe.</p>
+      <p className="muted">Preencha os dados abaixo. O envio encaminha para nossa equipe.</p>
 
       {/* STEP 1 - Empresa */}
-      <section style={{ marginTop: 24, padding: 16, border: '1px solid #eee', borderRadius: 12 }}>
+      <section className="card">
         <h2>1) Dados da Empresa</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div className="grid-2">
           <label>
             Razão Social*
             <input
@@ -587,9 +588,7 @@ export default function Home() {
               placeholder="(11) 99999-9999"
             />
             {empresa.telefone && !validarTelefoneBR(empresa.telefone) && (
-              <span style={{ color: '#b00', fontSize: 12, marginTop: 4 }}>
-                Telefone inválido (use DDD + número).
-              </span>
+              <span className="error-tip">Telefone inválido (use DDD + número).</span>
             )}
           </label>
           <label>
@@ -619,31 +618,32 @@ export default function Home() {
           </label>
         </div>
 
-        <div style={{ marginTop: 16 }}>
+        <div className="actions">
           <button disabled={!podeIrParaStep2} onClick={() => setStep(2)} style={{ opacity: podeIrParaStep2 ? 1 : 0.5 }}>
             Prosseguir para colaboradores
           </button>
-          {!cnpjValido && <p style={{ color: '#b00', marginTop: 8 }}>Informe um CNPJ válido para continuar.</p>}
+          {!cnpjValido && <p className="error">Informe um CNPJ válido para continuar.</p>}
         </div>
       </section>
 
       {/* STEP 2 - Colaboradores */}
       {step === 2 && (
-        <section style={{ marginTop: 24, padding: 16, border: '1px solid #eee', borderRadius: 12 }}>
+        <section className="card">
           <h2>2) Colaboradores</h2>
 
           {/* Seletor de modo de envio */}
-          <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className="modes">
+            <label className="mode-item">
               <input type="radio" name="modo" value="form" checked={envioModo === 'form'} onChange={() => setEnvioModo('form')} />
               Preencher/Importar na tela
             </label>
 
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label className="mode-item">
               <input type="radio" name="modo" value="pdf" checked={envioModo === 'pdf'} onChange={() => setEnvioModo('pdf')} />
               Anexar PDF com a lista (sem leitura)
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+
+            <label className="mode-item">
               <input type="radio" name="modo" value="excel" checked={envioModo === 'excel'} onChange={() => setEnvioModo('excel')} />
               Anexar Excel com a lista (sem leitura)
             </label>
@@ -651,20 +651,17 @@ export default function Home() {
 
           {envioModo === 'pdf' && (
             <>
-              <div style={{ border: '1px dashed #bbb', padding: 12, borderRadius: 8, marginBottom: 12 }}>
+              <div className="filebox">
                 <strong>Anexar PDF com a lista de colaboradores</strong>
-                <p style={{ margin: '6px 0 10px', color: '#555' }}>
-                  Selecione um arquivo <strong>.pdf</strong> (máx. {MAX_PDF_MB} MB). O arquivo será enviado em anexo (não faremos leitura do
-                  conteúdo).
+                <p className="muted">
+                  Selecione um arquivo <strong>.pdf</strong> (máx. {MAX_PDF_MB} MB). O arquivo será enviado em anexo (não faremos leitura do conteúdo).
                 </p>
 
                 <input
                   ref={pdfOnlyInputRef}
                   type="file"
                   accept="application/pdf"
-                  onClick={(e) => {
-                    (e.currentTarget as HTMLInputElement).value = '';
-                  }}
+                  onClick={(e) => { (e.currentTarget as HTMLInputElement).value = ''; }}
                   onChange={(e) => {
                     const f = e.target.files?.[0] ?? null;
                     if (f && f.size > MAX_PDF_BYTES) {
@@ -678,13 +675,13 @@ export default function Home() {
                 />
 
                 {pdfFile && (
-                  <p style={{ marginTop: 8, fontSize: 12, color: '#444' }}>
+                  <p className="fileinfo">
                     Selecionado: {pdfFile.name} ({(pdfFile.size / 1024 / 1024).toFixed(1)} MB)
                   </p>
                 )}
               </div>
 
-              <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+              <div className="actions">
                 <button
                   onClick={() => {
                     setStep(1);
@@ -692,7 +689,7 @@ export default function Home() {
                     setPdfFile(null);
                     if (pdfOnlyInputRef.current) pdfOnlyInputRef.current.value = '';
                   }}
-                  style={{ background: '#eee' }}
+                  className="secondary"
                 >
                   Voltar
                 </button>
@@ -706,20 +703,17 @@ export default function Home() {
 
           {envioModo === 'excel' && (
             <>
-              <div style={{ border: '1px dashed #bbb', padding: 12, borderRadius: 8, marginBottom: 12 }}>
+              <div className="filebox">
                 <strong>Anexar Excel com a lista de colaboradores</strong>
-                <p style={{ margin: '6px 0 10px', color: '#555' }}>
-                  Selecione um arquivo <strong>.xlsx</strong> ou <strong>.xls</strong> (máx. {MAX_PDF_MB} MB). O arquivo será enviado em
-                  anexo (não faremos leitura).
+                <p className="muted">
+                  Selecione um arquivo <strong>.xlsx</strong> ou <strong>.xls</strong> (máx. {MAX_PDF_MB} MB). O arquivo será enviado em anexo (não faremos leitura).
                 </p>
 
                 <input
                   ref={xlsOnlyInputRef}
                   type="file"
                   accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-                  onClick={(e) => {
-                    (e.currentTarget as HTMLInputElement).value = '';
-                  }}
+                  onClick={(e) => { (e.currentTarget as HTMLInputElement).value = ''; }}
                   onChange={(e) => {
                     const f = e.target.files?.[0] ?? null;
                     if (f && f.size > MAX_PDF_BYTES) {
@@ -741,13 +735,13 @@ export default function Home() {
                 />
 
                 {xlsFile && (
-                  <p style={{ marginTop: 8, fontSize: 12, color: '#444' }}>
+                  <p className="fileinfo">
                     Selecionado: {xlsFile.name} ({(xlsFile.size / 1024 / 1024).toFixed(1)} MB)
                   </p>
                 )}
               </div>
 
-              <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+              <div className="actions">
                 <button
                   onClick={() => {
                     setStep(1);
@@ -755,7 +749,7 @@ export default function Home() {
                     setXlsFile(null);
                     if (xlsOnlyInputRef.current) xlsOnlyInputRef.current.value = '';
                   }}
-                  style={{ background: '#eee' }}
+                  className="secondary"
                 >
                   Voltar
                 </button>
@@ -770,18 +764,15 @@ export default function Home() {
           {envioModo === 'form' && (
             <>
               {/* Importação por planilha */}
-              <div style={{ border: '1px dashed #bbb', padding: 12, borderRadius: 8, marginBottom: 12 }}>
+              <div className="filebox">
                 <strong>Importar colaboradores por planilha</strong>
-                <p style={{ margin: '6px 0 10px', color: '#555' }}>
-                  Formatos aceitos: <strong>.xlsx</strong>, .xls (também aceitamos .csv). Cabeçalhos:{' '}
-                  <em>Nome</em>, <em>CPF</em>, <em>Data de Nascimento</em> (opcional: <em>Nome da Mãe</em>).
+                <p className="muted">
+                  Formatos aceitos: <strong>.xlsx</strong>, .xls (também aceitamos .csv). Cabeçalhos: <em>Nome</em>, <em>CPF</em>, <em>Data de Nascimento</em> (opcional: <em>Nome da Mãe</em>).
                 </p>
                 <input
                   type="file"
                   accept=".xlsx,.xls,.csv"
-                  onClick={(e) => {
-                    (e.currentTarget as HTMLInputElement).value = '';
-                  }}
+                  onClick={(e) => { (e.currentTarget as HTMLInputElement).value = ''; }}
                   onChange={(e) => {
                     const f = e.target.files?.[0];
                     if (f) handleFileUpload(f);
@@ -789,14 +780,14 @@ export default function Home() {
                   }}
                 />
 
-                <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-                  <button type="button" style={{ background: '#eee', color: '#111' }} onClick={downloadXlsxTemplate}>
+                <div className="actions compact">
+                  <button type="button" className="secondary" onClick={downloadXlsxTemplate}>
                     Baixar modelo XLSX
                   </button>
 
                   <button
                     type="button"
-                    style={{ background: '#eee', color: '#111' }}
+                    className="secondary"
                     onClick={() => setColabs([{ nome: '', cpf: '', dataNascimento: '', nomeMae: '' }])}
                   >
                     Limpar lista
@@ -805,8 +796,8 @@ export default function Home() {
               </div>
 
               {colabs.map((c, i) => (
-                <div key={i} style={{ border: '1px solid #ddd', borderRadius: 8, padding: 12, marginTop: 12 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div key={i} className="card inner">
+                  <div className="grid-2">
                     <label>
                       Nome*
                       <input value={c.nome} onChange={(e) => handleColabChange(i, 'nome', e.target.value)} />
@@ -820,7 +811,7 @@ export default function Home() {
                         maxLength={14}
                       />
                       {c.cpf && !validarCPF(c.cpf) && (
-                        <span style={{ color: '#b00', fontSize: 12, marginTop: 4 }}>CPF inválido</span>
+                        <span className="error-tip">CPF inválido</span>
                       )}
                     </label>
                     <label>
@@ -831,9 +822,7 @@ export default function Home() {
                         placeholder="01/02/1990"
                       />
                       {c.dataNascimento && !isDataBR(c.dataNascimento) && (
-                        <span style={{ color: '#b00', fontSize: 12, marginTop: 4 }}>
-                          Data inválida (use dd/mm/aaaa)
-                        </span>
+                        <span className="error-tip">Data inválida (use dd/mm/aaaa)</span>
                       )}
                     </label>
                     <label>
@@ -841,34 +830,32 @@ export default function Home() {
                       <input value={c.nomeMae} onChange={(e) => handleColabChange(i, 'nomeMae', e.target.value)} />
                     </label>
                   </div>
-                  <div style={{ marginTop: 8 }}>
+                  <div className="actions compact">
                     {colabs.length > 1 && (
-                      <button onClick={() => removeColab(i)} style={{ background: '#eee' }}>
-                        Remover
-                      </button>
+                      <button onClick={() => removeColab(i)} className="secondary">Remover</button>
                     )}
                   </div>
                 </div>
               ))}
-              <div style={{ marginTop: 12 }}>
+              <div className="actions compact">
                 <button onClick={addColab} disabled={!podeAdicionarColab}>
                   + Adicionar colaborador
                 </button>
                 {!podeAdicionarColab && (
-                  <p style={{ color: '#b00', fontSize: 12, marginTop: 6 }}>
+                  <p className="error small">
                     Preencha todos os campos do colaborador atual (CPF válido e data em dd/mm/aaaa) para adicionar
                     outro.
                   </p>
                 )}
               </div>
 
-              <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+              <div className="actions">
                 <button
                   onClick={() => {
                     setStep(1);
                     setTenteiEnviar(false);
                   }}
-                  style={{ background: '#eee' }}
+                  className="secondary"
                 >
                   Voltar
                 </button>
@@ -876,23 +863,47 @@ export default function Home() {
               </div>
 
               {tenteiEnviar && !todosCPFsValidos && (
-                <p style={{ color: '#b00', marginTop: 8 }}>Corrija os CPFs inválidos para enviar.</p>
+                <p className="error">Corrija os CPFs inválidos para enviar.</p>
               )}
             </>
           )}
         </section>
       )}
 
-      {/* estilos bem simples */}
+      {/* estilos responsivos */}
       <style jsx>{`
-        h1 {
-          font-size: 26px;
-          margin-bottom: 8px;
+        :global(*), :global(*::before), :global(*::after) {
+          box-sizing: border-box;
         }
-        h2 {
-          font-size: 18px;
-          margin-bottom: 8px;
+
+        .container {
+          max-width: 860px;
+          margin: 32px auto;
+          padding: 24px;
         }
+
+        h1 { font-size: 26px; margin-bottom: 8px; }
+        h2 { font-size: 18px; margin-bottom: 8px; }
+        .muted { color: #555; }
+
+        .card {
+          margin-top: 24px;
+          padding: 16px;
+          border: 1px solid #eee;
+          border-radius: 12px;
+          background: #fff;
+        }
+        .card.inner {
+          margin-top: 12px;
+          padding: 12px;
+        }
+
+        .grid-2 {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+        }
+
         label {
           display: flex;
           flex-direction: column;
@@ -904,7 +915,40 @@ export default function Home() {
           border-radius: 8px;
           padding: 10px;
           font-size: 14px;
+          width: 100%;
         }
+
+        .modes {
+          display: flex;
+          gap: 16px;
+          margin-bottom: 12px;
+          flex-wrap: wrap;
+        }
+        .mode-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          white-space: nowrap;
+        }
+
+        .filebox {
+          border: 1px dashed #bbb;
+          padding: 12px;
+          border-radius: 8px;
+          margin-bottom: 12px;
+          word-break: break-word;
+        }
+        .fileinfo { margin-top: 8px; font-size: 12px; color: #444; }
+
+        .actions {
+          margin-top: 16px;
+          display: flex;
+          gap: 8px;
+          align-items: center;
+          flex-wrap: wrap;
+        }
+        .actions.compact { margin-top: 8px; }
+
         button {
           border: 0;
           border-radius: 8px;
@@ -912,9 +956,41 @@ export default function Home() {
           cursor: pointer;
           background: #0ea5e9;
           color: #fff;
+          transition: filter .15s ease;
         }
-        button[disabled] {
-          cursor: not-allowed;
+        button:hover { filter: brightness(0.95); }
+        button.secondary {
+          background: #eee;
+          color: #111;
+        }
+        button[disabled] { cursor: not-allowed; opacity: .6; }
+
+        .error { color: #b00; }
+        .error.small { font-size: 12px; }
+        .error-tip { color: #b00; font-size: 12px; margin-top: 4px; }
+
+        /* ====== MOBILE (≤640px) ====== */
+        @media (max-width: 640px) {
+          .container { padding: 16px; margin: 20px auto; }
+          .card { padding: 12px; border-radius: 10px; }
+          .grid-2 { grid-template-columns: 1fr; gap: 10px; }
+
+          .modes { gap: 12px; }
+          .mode-item { width: 100%; }
+
+          .actions {
+            flex-direction: column;
+            align-items: stretch;
+          }
+          .actions > button {
+            width: 100%;
+          }
+        }
+
+        /* ====== TABLET (641–900px) ====== */
+        @media (min-width: 641px) and (max-width: 900px) {
+          .grid-2 { grid-template-columns: 1fr 1fr; gap: 12px; }
+          .container { padding: 20px; }
         }
       `}</style>
     </main>
