@@ -35,6 +35,7 @@ function validarTelefoneBR(s: string) {
   const d = onlyDigits(s);
   return d.length === 10 || d.length === 11; // DDD+fixo ou DDD+cel
 }
+const pl = (n: number, s: string, p?: string) => n === 1 ? s : (p ?? s + 's');
 
 function formatCPF(s: string) {
   const d = onlyDigits(s).slice(0, 11);
@@ -140,6 +141,95 @@ export default function Home() {
   const [xlsFile, setXlsFile] = useState<File | null>(null);
   const xlsOnlyInputRef = useRef<HTMLInputElement | null>(null);
 
+  // ---------------- Modal controlado (OK libera após 3s) ----------------
+  type ModalKind = 'success' | 'error' | 'info';
+
+  type ModalState = {
+    open: boolean;
+    title: string;
+    message: string;
+    kind: ModalKind;
+    countdown: number;         // segundos restantes para habilitar o OK
+    onOk?: () => void;         // ação ao clicar OK
+  };
+
+  const [modal, setModal] = useState<ModalState>({
+    open: false,
+    title: '',
+    message: '',
+    kind: 'info',
+    countdown: 0,
+  });
+
+  const modalTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  function closeModal() {
+    if (modalTimerRef.current) {
+      clearInterval(modalTimerRef.current);
+      modalTimerRef.current = null;
+    }
+    setModal((m) => ({ ...m, open: false, countdown: 0 }));
+  }
+
+  function openModal(opts: Omit<ModalState, 'open' | 'countdown'> & { countdown?: number }) {
+    // limpa timer anterior
+    if (modalTimerRef.current) {
+      clearInterval(modalTimerRef.current);
+      modalTimerRef.current = null;
+    }
+
+    const initial = Math.max(0, opts.countdown ?? 3); // padrão 3s
+    setModal({
+      open: true,
+      title: opts.title,
+      message: opts.message,
+      kind: opts.kind,
+      countdown: initial,
+      onOk: opts.onOk,
+    });
+
+    // inicia contagem regressiva se necessário
+    if (initial > 0) {
+      modalTimerRef.current = setInterval(() => {
+        setModal((prev) => {
+          if (prev.countdown <= 1) {
+            if (modalTimerRef.current) {
+              clearInterval(modalTimerRef.current);
+              modalTimerRef.current = null;
+            }
+            return { ...prev, countdown: 0 };
+          }
+          return { ...prev, countdown: prev.countdown - 1 };
+        });
+      }, 1000);
+    }
+  }
+
+  const okEnabled = modal.countdown === 0;
+
+  function resetAll() {
+    setStep(1);
+    setEnvioModo('form');
+    setPdfFile(null);
+    setXlsFile(null);
+    setTenteiEnviar(false);
+    if (pdfOnlyInputRef.current) pdfOnlyInputRef.current.value = '';
+    if (xlsOnlyInputRef.current) xlsOnlyInputRef.current.value = '';
+    setEmpresa({
+      razaoSocial: '',
+      cnpj: '',
+      email: '',
+      telefone: '',
+      cidade: '',
+      uf: '',
+      cep: '',
+      atendente: '',
+    });
+    setColabs([{ nome: '', cpf: '', dataNascimento: '', nomeMae: '' }]);
+  }
+
+
+
   // Empresa
   const [empresa, setEmpresa] = useState<Empresa>({
     razaoSocial: '',
@@ -223,7 +313,14 @@ export default function Home() {
     const keyMae = mapKey(sample, ['Nome da Mãe', 'Nome da Mae', 'Mae']); // opcional
 
     if (!keyNome || !keyCPF || !keyDN) {
-      alert('Cabeçalhos esperados: Nome, CPF, Data de Nascimento (Nome da Mãe é opcional).');
+      openModal({
+        title: 'Cabeçalhos ausentes',
+        message:
+          'Cabeçalhos esperados: Nome, CPF, Data de Nascimento (Nome da Mãe é opcional).',
+        kind: 'error',
+        countdown: 3,
+        onOk: () => closeModal(),
+      });
       return;
     }
 
@@ -322,18 +419,41 @@ export default function Home() {
         adicionados.push(novo);
       }
 
-      let msg = `Importação concluída.`;
-      if (adicionados.length) msg += `\nAdicionados: ${adicionados.length}`;
-      if (atualizados.length) msg += `\nAtualizados: ${atualizados.length}`;
-      if (rejeitados.length) msg += `\nIgnorados (inválidos): ${rejeitados.length}`;
-      if (conflitos.length) msg += `\nConflitos (mesmo nome com CPF diferente): ${conflitos.length}`;
-      if (rejeitados.length || conflitos.length) {
-        msg += `\n\nDetalhes:\n`;
-        if (rejeitados.length) msg += `- Inválidos:\n  - ${rejeitados.join('\n  - ')}\n`;
-        if (conflitos.length) msg += `- Conflitos:\n  - ${conflitos.join('\n  - ')}`;
-      }
-      alert(msg);
+      // ===== Monta um relatório legível =====
+      const resumoPartes: string[] = [];
+      if (adicionados.length) resumoPartes.push(`${adicionados.length} ${pl(adicionados.length, 'adicionado')}`);
+      if (atualizados.length) resumoPartes.push(`${atualizados.length} ${pl(atualizados.length, 'atualizado')}`);
+      if (rejeitados.length) resumoPartes.push(`${rejeitados.length} ${pl(rejeitados.length, 'inválido')} ignorado${rejeitados.length > 1 ? 's' : ''}`);
+      if (conflitos.length) resumoPartes.push(`${conflitos.length} ${pl(conflitos.length, 'conflito')}`);
 
+      const linhas: string[] = [
+        'Importação concluída ✅',
+        '',
+        'Resumo',
+        `• ${resumoPartes.length ? resumoPartes.join(' · ') : 'Sem alterações'}`,
+      ];
+
+      // Seções de detalhes (aparecem só se houver itens)
+      if (rejeitados.length || conflitos.length) {
+        linhas.push('', 'Detalhes');
+        if (rejeitados.length) {
+          linhas.push('Inválidos:');
+          linhas.push(...rejeitados.map(x => `  – ${x}`));
+        }
+        if (conflitos.length) {
+          linhas.push('Conflitos:');
+          linhas.push(...conflitos.map(x => `  – ${x}`));
+        }
+      }
+
+      // Abre o modal (OK liberado após 3s)
+      openModal({
+        title: 'Importação concluída',
+        message: linhas.join('\n'),
+        kind: (conflitos.length || rejeitados.length) ? 'error' : 'success',
+        countdown: 3,
+        onOk: () => closeModal(),
+      });
       return base;
     });
   }
@@ -427,28 +547,27 @@ export default function Home() {
       const r = await fetch('/api/adesao', { method: 'POST', body: form });
 
       if (r.ok) {
-        alert('PDF enviado! Você receberá a confirmação quando o envio por e-mail estiver ativo.');
-        // reset
-        setStep(1);
-        setEnvioModo('form');
-        setPdfFile(null);
-        setTenteiEnviar(false);
-        if (pdfOnlyInputRef.current) pdfOnlyInputRef.current.value = '';
-        setEmpresa({
-          razaoSocial: '',
-          cnpj: '',
-          email: '',
-          telefone: '',
-          cidade: '',
-          uf: '',
-          cep: '',
-          atendente: '',
+        openModal({
+          title: 'Enviado com sucesso!',
+          message: 'Você receberá a confirmação por e-mail quando o cadastro estiver completo.',
+          kind: 'success',
+          countdown: 3,
+          onOk: () => {
+            closeModal();
+            resetAll();
+          }
         });
-        setColabs([{ nome: '', cpf: '', dataNascimento: '', nomeMae: '' }]);
       } else {
         const j = await r.json().catch(() => ({}));
-        alert(`Falha ao enviar PDF: ${(j as Record<string, unknown>)?.['error'] ?? r.statusText}`);
+        openModal({
+          title: 'Falha ao enviar PDF',
+          message: String((j as Record<string, unknown>)?.['error'] ?? r.statusText),
+          kind: 'error',
+          countdown: 3,
+          onOk: () => closeModal()
+        });
       }
+
       return;
     }
 
@@ -475,27 +594,25 @@ export default function Home() {
       const r = await fetch('/api/adesao', { method: 'POST', body: form });
 
       if (r.ok) {
-        alert('Excel enviado! Você receberá a confirmação por e-mail (quando o envio estiver ativo).');
-        // reset
-        setStep(1);
-        setEnvioModo('form');
-        setXlsFile(null);
-        setTenteiEnviar(false);
-        if (xlsOnlyInputRef.current) xlsOnlyInputRef.current.value = '';
-        setEmpresa({
-          razaoSocial: '',
-          cnpj: '',
-          email: '',
-          telefone: '',
-          cidade: '',
-          uf: '',
-          cep: '',
-          atendente: '',
+        openModal({
+          title: 'Excel enviado!',
+          message: 'Você receberá a confirmação por e-mail quando o envio estiver ativo.',
+          kind: 'success',
+          countdown: 3,
+          onOk: () => {
+            closeModal();
+            resetAll();
+          }
         });
-        setColabs([{ nome: '', cpf: '', dataNascimento: '', nomeMae: '' }]);
       } else {
         const j = await r.json().catch(() => ({}));
-        alert(`Falha ao enviar Excel: ${(j as Record<string, unknown>)?.['error'] ?? r.statusText}`);
+        openModal({
+          title: 'Falha ao enviar Excel',
+          message: String((j as Record<string, unknown>)?.['error'] ?? r.statusText),
+          kind: 'error',
+          countdown: 3,
+          onOk: () => closeModal()
+        });
       }
       return;
     }
@@ -529,49 +646,54 @@ export default function Home() {
     });
 
     if (r.ok) {
-      alert('Enviado com sucesso! Você receberá o e-mail com os dados (quando o envio estiver ativo).');
-      setStep(1);
-      setEmpresa({
-        razaoSocial: '',
-        cnpj: '',
-        email: '',
-        telefone: '',
-        cidade: '',
-        uf: '',
-        cep: '',
-        atendente: '',
+      openModal({
+        title: 'Enviado com sucesso!',
+        message: 'Você receberá o e-mail com os dados quando o envio estiver ativo.',
+        kind: 'success',
+        countdown: 3,
+        onOk: () => {
+          closeModal();
+          resetAll();
+        }
       });
-      setColabs([{ nome: '', cpf: '', dataNascimento: '', nomeMae: '' }]);
-      setTenteiEnviar(false);
     } else {
       const j = await r.json().catch(() => ({}));
-      alert(`Falha ao enviar: ${(j as Record<string, unknown>)?.['error'] ?? r.statusText}`);
+      openModal({
+        title: 'Falha ao enviar',
+        message: String((j as Record<string, unknown>)?.['error'] ?? r.statusText),
+        kind: 'error',
+        countdown: 3,
+        onOk: () => closeModal()
+      });
     }
+
   }
 
   return (
     <main className="container">
-      <h1>Adesão – HS</h1>
+      <h1>Adesão - Produto Convenção Coletiva</h1>
       <p className="muted">Preencha os dados abaixo. O envio encaminha para nossa equipe.</p>
 
       {/* STEP 1 - Empresa */}
       <section className="card">
-        <h2>1) Dados da Empresa</h2>
+        <h2>Dados da Empresa</h2>
         <div className="grid-2">
-          <label>
-            Razão Social*
-            <input
-              value={empresa.razaoSocial}
-              onChange={(e) => handleEmpresaChange('razaoSocial', e.target.value)}
-              placeholder="ACME LTDA"
-            />
-          </label>
           <label>
             CNPJ* {cnpjValido ? '✅' : ''}
             <input
               value={empresa.cnpj}
               onChange={(e) => handleEmpresaChange('cnpj', e.target.value)}
               placeholder="00.000.000/0001-00"
+            />
+          </label>
+          <label>
+            Razão Social
+            <input
+              value={empresa.razaoSocial}
+              readOnly
+              placeholder="Preenchido automaticamente pelo CNPJ"
+              style={{ background: '#f5f5f5', cursor: 'not-allowed' }}
+              aria-readonly="true"
             />
           </label>
           <label>
@@ -614,10 +736,12 @@ export default function Home() {
           <label>
             UF
             <input
-              value={empresa.uf || ''}
-              onChange={(e) => handleEmpresaChange('uf', e.target.value.toUpperCase())}
-              placeholder="SP"
+              value={(empresa.uf || '').toUpperCase()}
+              readOnly
+              placeholder=""
               maxLength={2}
+              aria-readonly="true"
+              style={{ background: '#f5f5f5', cursor: 'not-allowed' }}
             />
           </label>
           <label>
@@ -631,7 +755,7 @@ export default function Home() {
         </div>
 
         <div className="actions">
-          <button disabled={!podeIrParaStep2} onClick={() => setStep(2)} style={{ opacity: podeIrParaStep2 ? 1 : 0.5 }}>
+          <button disabled={!podeIrParaStep2} onClick={() => setStep(2)} style={{ opacity: podeIrParaStep2 ? 1 : 0.1 }}>
             Prosseguir para colaboradores
           </button>
           {!cnpjValido && <p className="error">Informe um CNPJ válido para continuar.</p>}
@@ -641,7 +765,7 @@ export default function Home() {
       {/* STEP 2 - Colaboradores */}
       {step === 2 && (
         <section className="card">
-          <h2>2) Colaboradores</h2>
+          <h2>Dados Colaboradores</h2>
 
           {/* Seletor de modo de envio */}
           <div className="modes">
@@ -727,24 +851,55 @@ export default function Home() {
                   accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                   onClick={(e) => { (e.currentTarget as HTMLInputElement).value = ''; }}
                   onChange={(e) => {
-                    const f = e.target.files?.[0] ?? null;
-                    if (f && f.size > MAX_PDF_BYTES) {
-                      alert(`O arquivo tem ${(f.size / 1024 / 1024).toFixed(1)} MB. O limite é ${MAX_PDF_MB} MB.`);
+                    const inputEl = e.currentTarget as HTMLInputElement;
+                    const f = inputEl.files?.[0] ?? null;
+                    if (!f) {
                       setXlsFile(null);
-                      (e.currentTarget as HTMLInputElement).value = '';
                       return;
                     }
-                    const name = (f?.name || '').toLowerCase();
+
+                    const sizeMB = f.size / 1024 / 1024;
+                    if (sizeMB > MAX_PDF_MB) {
+                      openModal({
+                        title: 'Arquivo muito grande',
+                        message: `O arquivo tem ${sizeMB.toFixed(1)} MB. O limite é ${MAX_PDF_MB} MB.`,
+                        kind: 'error',
+                        countdown: 3,
+                        onOk: () => {
+                          closeModal();
+                          setXlsFile(null);
+                          inputEl.value = '';
+                        },
+                      });
+                      return;
+                    }
+
+                    // valida extensão e (se disponível) MIME
+                    const name = (f.name || '').toLowerCase();
                     const okExt = name.endsWith('.xlsx') || name.endsWith('.xls');
-                    if (f && !okExt) {
-                      alert('Escolha um arquivo .xlsx ou .xls.');
-                      setXlsFile(null);
-                      (e.currentTarget as HTMLInputElement).value = '';
+                    const okMime =
+                      f.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+                      f.type === 'application/vnd.ms-excel';
+
+                    if (!okExt && !okMime) {
+                      openModal({
+                        title: 'Tipo de arquivo inválido',
+                        message: 'Escolha um arquivo .xlsx ou .xls.',
+                        kind: 'error',
+                        countdown: 3,
+                        onOk: () => {
+                          closeModal();
+                          setXlsFile(null);
+                          inputEl.value = '';
+                        },
+                      });
                       return;
                     }
+
                     setXlsFile(f);
                   }}
                 />
+
 
                 {xlsFile && (
                   <p className="fileinfo">
@@ -976,16 +1131,16 @@ export default function Home() {
           border-radius: 8px;
           padding: 10px 14px;
           cursor: pointer;
-          background: #0ea5e9;
+          background: #00ff22cd;
           color: #fff;
           transition: filter .15s ease;
         }
-        button:hover { filter: brightness(0.95); }
+        button:hover { filter: brightness(0.75); }
         button.secondary {
-          background: #eee;
+          background: #eeeeeeff;
           color: #111;
         }
-        button[disabled] { cursor: not-allowed; opacity: .6; }
+        button[disabled] { cursor: not-allowed; opacity: .1; }
 
         .error { color: #b00; }
         .error.small { font-size: 12px; }
@@ -1015,6 +1170,66 @@ export default function Home() {
           .container { padding: 20px; }
         }
       `}</style>
+      {/* Modal simples controlado */}
+      {modal.open && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,.4)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+            zIndex: 9999
+          }}
+          onClick={closeModal}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 520,
+              background: '#fff',
+              color: '#111',
+              borderRadius: 12,
+              border: '1px solid #e5e7eb',
+              boxShadow: '0 10px 40px rgba(0,0,0,.15)',
+              padding: 20
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ marginBottom: 8 }}>
+              <h3 style={{ margin: 0, fontSize: 18 }}>
+                {modal.title}
+              </h3>
+              <p style={{ margin: '8px 0 0', color: '#555' }}>{modal.message}</p>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
+              {/* <button
+                onClick={closeModal}
+                style={{ background: '#eee', color: '#111' }}
+              >
+                Fechar
+              </button> */}
+              <button
+                onClick={() => {
+                  if (okEnabled) {
+                    modal.onOk?.();
+                  }
+                }}
+                disabled={!okEnabled}
+                title={!okEnabled ? 'Aguarde a leitura' : 'Confirmar'}
+              >
+                {okEnabled ? 'OK' : `OK (${modal.countdown})`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </main>
   );
 }

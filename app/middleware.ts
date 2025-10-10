@@ -23,7 +23,7 @@ function zonedHourAndWeekday(date: Date, timeZone: string) {
 function isOpenAt(date: Date, timeZone: string) {
   const { hour, dow } = zonedHourAndWeekday(date, timeZone);
   const weekday = dow >= 1 && dow <= 5;       // seg..sex
-  const businessHours = hour >= 8 && hour < 14; // 08:00–17:59
+  const businessHours = hour >= 8 && hour < 9; // 08:00–17:59
   return weekday && businessHours;
 }
 
