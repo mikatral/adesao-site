@@ -1,26 +1,97 @@
 @import "tailwindcss";
 
+/* Tema CLARO (fixo) */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  /* fontes vindas do layout (Geist) */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* cores base */
+  --background: #ffffff;
+  --foreground: #171717;
+
+  /* extras pra UI */
+  --muted: #f1f5f9;              /* slate-100 */
+  --muted-foreground: #475569;   /* slate-600 */
+  --border: #e5e7eb;             /* gray-200 */
+  --input-border: #cbd5e1;       /* slate-300 */
+  --input-bg: #ffffff;
+  --input-text: #111827;         /* gray-900 */
+  --primary: #0ea5e9;            /* sky-500 */
+  --primary-foreground: #ffffff;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* força componentes nativos (inputs, selects) no modo claro */
+html { color-scheme: light; }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system,
+               "Segoe UI", Roboto, "Helvetica Neue", Arial, "Apple Color Emoji",
+               "Segoe UI Emoji";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+/* ===== elementos básicos do formulário ===== */
+label {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  gap: 6px;
+}
+
+input, select, textarea {
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 14px;
+  background: var(--input-bg);
+  color: var(--input-text);
+}
+
+button {
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+button[disabled] { cursor: not-allowed; opacity: .7; }
+
+/* ===== utilitários para suas seções e grid ===== */
+.section {
+  margin-top: 24px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 640px) {
+  .grid-2 { grid-template-columns: 1fr; }
+}
+
+/* área de upload tracejada usada nos anexos */
+.uploader {
+  border: 1px dashed #bbb;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+/* mensagens auxiliares */
+.error-tip { color: #b91c1c; font-size: 12px; margin-top: 4px; }
+.note { color: var(--muted-foreground); }
+
+/* ajustes gerais */
+* { box-sizing: border-box; }
+img { max-width: 100%; height: auto; }
+table { width: 100%; border-collapse: collapse; }
