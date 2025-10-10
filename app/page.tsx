@@ -206,6 +206,19 @@ export default function Home() {
   }
 
   const okEnabled = modal.countdown === 0;
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (!modal.open) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', onKeyDown, { capture: true });
+  }, [modal.open]);
+
 
   function resetAll() {
     setStep(1);
@@ -484,11 +497,11 @@ export default function Home() {
               typeof (bruto as Record<string, unknown>)['razao_social'] === 'string'
                 ? String((bruto as Record<string, unknown>)['razao_social'])
                 : e.razaoSocial,
-            email: e.email, 
+            email: e.email,
           }));
         }
       } catch {
-        
+
       }
     }
     fetchCNPJ();
@@ -755,7 +768,7 @@ export default function Home() {
         </div>
 
         <div className="actions">
-          <button disabled={!podeIrParaStep2} onClick={() => setStep(2)} style={{ opacity: podeIrParaStep2 ? 1 : 0.1 }}>
+          <button disabled={!podeIrParaStep2} onClick={() => setStep(2)} style={{ opacity: podeIrParaStep2 ? 1 : 0.3 }}>
             Prosseguir para colaboradores
           </button>
           {!cnpjValido && <p className="error">Informe um CNPJ válido para continuar.</p>}
@@ -1140,7 +1153,7 @@ export default function Home() {
           background: #eeeeeeff;
           color: #111;
         }
-        button[disabled] { cursor: not-allowed; opacity: .1; }
+        button[disabled] { cursor: not-allowed; color: rgba(225, 255, 0, 1); background: rgba(255, 0, 0, 1); opacity: 0.3; }
 
         .error { color: #b00; }
         .error.small { font-size: 12px; }
@@ -1185,7 +1198,7 @@ export default function Home() {
             padding: 16,
             zIndex: 9999
           }}
-          onClick={closeModal}
+          
         >
           <div
             style={{
