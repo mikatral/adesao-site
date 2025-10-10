@@ -484,11 +484,11 @@ export default function Home() {
               typeof (bruto as Record<string, unknown>)['razao_social'] === 'string'
                 ? String((bruto as Record<string, unknown>)['razao_social'])
                 : e.razaoSocial,
-            email: e.email, // não sobrescreve
+            email: e.email, 
           }));
         }
       } catch {
-        // mantém dados manuais
+        
       }
     }
     fetchCNPJ();
