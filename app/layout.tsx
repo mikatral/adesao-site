@@ -4,6 +4,7 @@ import Script from "next/script";
 import Link from "next/link";
 import "./globals.css";
 import AnalyticsListener from "./ga/AnalyticsListener";
+import { Suspense } from "react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -48,7 +49,9 @@ export default function RootLayout({
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {/* GA - escuta mudanças de rota (App Router) */}
-        <AnalyticsListener />
+        <Suspense fallback={null}>
+          <AnalyticsListener />
+        </Suspense>
 
         {/* Header */}
         <header className="site-header">

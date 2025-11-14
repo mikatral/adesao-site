@@ -8,7 +8,7 @@ export async function GET() {
     {
       name: "download_pdf",
       params: {
-        slug: "odonto_guia",
+        slug: "odonto_informativo_rede_carteirinha",
       },
     },
   ]);
@@ -18,15 +18,24 @@ export async function GET() {
     "public",
     "downloads",
     "odonto",
-    "guia-odonto.pdf"
+    "INFORMATIVO - ODONTO - REDE + CARTEIRINHA.pdf"
   );
 
-  const file = await readFile(filePath);
+  
+  const buffer = await readFile(filePath);
 
-  return new NextResponse(file, {
+ 
+  const uint8 = new Uint8Array(buffer);
+
+
+  const blob = new Blob([uint8], { type: "application/pdf" });
+
+ 
+  return new NextResponse(blob, {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": 'attachment; filename="guia-odonto.pdf"',
+      "Content-Disposition":
+        'attachment; filename="informativo-odonto-rede-carteirinha.pdf"',
       "Cache-Control": "public, max-age=31536000, immutable",
     },
   });

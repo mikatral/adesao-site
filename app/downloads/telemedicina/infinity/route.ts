@@ -21,9 +21,11 @@ export async function GET() {
     "INFINITY - COMO UTILIZAR.pdf"
   );
 
-  const file = await readFile(filePath);
+  const buffer = await readFile(filePath);
+  const uint8 = new Uint8Array(buffer);
+  const blob = new Blob([uint8], { type: "application/pdf" });
 
-  return new NextResponse(file, {
+  return new NextResponse(blob, {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition":
