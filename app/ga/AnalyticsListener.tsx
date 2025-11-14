@@ -1,8 +1,9 @@
-// app/ga/AnalyticsListener.tsx
 "use client";
 
 import { useEffect } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
+
+const GA_ID = process.env.NEXT_PUBLIC_GA_ID || "G-NWHS5JN1ZN";
 
 export default function AnalyticsListener() {
   const pathname = usePathname();
@@ -10,13 +11,19 @@ export default function AnalyticsListener() {
 
   useEffect(() => {
     if (!pathname) return;
+    if (typeof window === "undefined") return;
 
-    // aguarda GA ter carregado
-    if (typeof window === "undefined" || !(window as any).gtag) return;
+    const url =
+      pathname + (searchParams?.toString() ? `?${searchParams.toString()}` : "");
 
-    const url = pathname + (searchParams?.toString() ? `?${searchParams}` : "");
+    // Tipar o window com gtag opcional, sem usar any
+    const w = window as Window & {
+      gtag?: (command: string, targetId: string, params?: Record<string, unknown>) => void;
+    };
 
-    (window as any).gtag("config", process.env.NEXT_PUBLIC_GA_ID || "G-NWHS5JN1ZN", {
+    if (!w.gtag) return;
+
+    w.gtag("config", GA_ID, {
       page_path: url,
     });
   }, [pathname, searchParams]);

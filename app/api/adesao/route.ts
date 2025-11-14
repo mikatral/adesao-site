@@ -308,7 +308,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, messageId: info.messageId });
   } catch (e) {
-    // eslint-disable-next-line no-console
+    
     console.error(e);
     return NextResponse.json({ error: 'Erro inesperado.' }, { status: 500 });
   }

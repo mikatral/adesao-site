@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
+import Link from "next/link";
 import "./globals.css";
 import AnalyticsListener from "./ga/AnalyticsListener";
 
@@ -52,16 +53,16 @@ export default function RootLayout({
         {/* Header */}
         <header className="site-header">
           <div className="container header-inner">
-            <a href="/" className="brand" aria-label="Início">
+            <Link href="/" className="brand" aria-label="Início">
               Contrato Seguros
-            </a>
+            </Link>
             <nav className="nav">
-              <a href="/" className="nav-link">
+              <Link href="/" className="nav-link">
                 Adesão
-              </a>
-              <a href="/faq" className="nav-link">
+              </Link>
+              <Link href="/faq" className="nav-link">
                 FAQ
-              </a>
+              </Link>
             </nav>
           </div>
         </header>
@@ -73,12 +74,12 @@ export default function RootLayout({
         <footer className="site-footer">
           <div className="container footer-inner">
             <nav className="footer-nav">
-              <a href="/" className="nav-link">
+              <Link href="/" className="nav-link">
                 Adesão
-              </a>
-              <a href="/faq" className="nav-link">
+              </Link>
+              <Link href="/faq" className="nav-link">
                 FAQ
-              </a>
+              </Link>
             </nav>
             <small className="copyright">
               © {new Date().getFullYear()} Contrato Seguros
