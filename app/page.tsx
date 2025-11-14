@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Empresa, Colaborador, EnvioModo } from '@/types/domain';
+import { useRouter } from 'next/navigation';
+
+
 
 function onlyDigits(s: string) {
   return (s || '').replace(/\D/g, '');
@@ -140,6 +143,8 @@ export default function Home() {
   const pdfOnlyInputRef = useRef<HTMLInputElement | null>(null);
   const [xlsFile, setXlsFile] = useState<File | null>(null);
   const xlsOnlyInputRef = useRef<HTMLInputElement | null>(null);
+
+  const router = useRouter();
 
   // ---------------- Modal controlado (OK libera após 3s) ----------------
   type ModalKind = 'success' | 'error' | 'info';
@@ -568,6 +573,7 @@ export default function Home() {
           onOk: () => {
             closeModal();
             resetAll();
+            router.push('/faq?ok=1');
           }
         });
       } else {
@@ -609,12 +615,13 @@ export default function Home() {
       if (r.ok) {
         openModal({
           title: 'Excel enviado!',
-          message: 'Você receberá a confirmação por e-mail quando o envio estiver ativo.',
+          message: 'Você receberá a confirmação por e-mail quando o cadastro estiver completo.',
           kind: 'success',
           countdown: 3,
           onOk: () => {
             closeModal();
             resetAll();
+            router.push('/faq?ok=1');
           }
         });
       } else {
@@ -661,12 +668,13 @@ export default function Home() {
     if (r.ok) {
       openModal({
         title: 'Enviado com sucesso!',
-        message: 'Você receberá o e-mail com os dados quando o envio estiver ativo.',
+        message: 'Você receberá a confirmação por e-mail quando o cadastro estiver completo..',
         kind: 'success',
         countdown: 3,
         onOk: () => {
           closeModal();
           resetAll();
+          router.push('/faq?ok=1');
         }
       });
     } else {
